@@ -1222,6 +1222,7 @@
             <button id="new_shortcut" class="initiation_hidden"><span>创建捷径</span></button>
             <button id="copy_from" class="initiation_hidden"><span>转存自...</span></button>
             <button id="batch_copy_link" class="initiation_hidden"><span>复制链接</span></button>
+            <button id="batch_download" class="initiation_hidden"><span>批量下载</span></button>
             <button class="annoy-action initiation_hidden" id="batch_trash"><span>移至垃圾桶</span></button>
             <button class="dangerous-action initiation_hidden" id="batch_delete"><span>永久删除</span></button>
         </div>
@@ -1473,6 +1474,7 @@ function switchButtonGroup(r) {
     if (!r) r = getSelectedFile();
     if (r.selectCount === 0) {
         document.querySelector('#batch_copy_link').style.display = 'none';
+        if (document.querySelector('#batch_download')) document.querySelector('#batch_download').style.display = 'none';
         document.querySelector('#batch_trash').style.display = 'none';
         document.querySelector('#batch_delete').style.display = 'none';
 
@@ -1504,6 +1506,9 @@ function switchButtonGroup(r) {
         document.querySelector('#new_shortcut').style.display = 'none';
 
         document.querySelector('#batch_copy_link').style.display = 'inline';
+        if (document.querySelector('#batch_download')) {
+            document.querySelector('#batch_download').style.display = window.root_attr.download ? 'inline' : 'none';
+        }
         if (window.root_attr.can_trash && window.root_attr.trash === true) {
             document.querySelector('#batch_trash').style.display = 'inline';
         } else {
@@ -3934,7 +3939,7 @@ async function _resolveTree(source, download_file = false) {
     // chdir(null);
     toggleAnimation(false);
     fetchingStatusBar.displayInfo();
-    if (data.summary.fileCount > 0) {
+    if (data && data.summary && data.summary.fileCount > 0) {
         if (download_file) {
             if (confirm(`${data.summary.fileCount}个文件，总大小${formatBytes(parseInt(data.summary.totalSize, 10)).replace(/\s/, "")}，开始下载？`)) {
                 if (source.endsWith("/")) source = source.slice(0, -1);
@@ -4172,6 +4177,70 @@ if (window.root_attr.multiple_selection) {
             console.error('复制失败:', err);
         });
     });
+    const batchDlBtn = document.querySelector('#batch_download');
+    if (batchDlBtn) {
+        batchDlBtn.addEventListener('click', async function (e) {
+            if (document.getElementById("progress-bar").style.display !== "none") {
+                return;
+            }
+            let items = getSelectedFile().selected;
+            if (items.length === 0) return;
+
+            let files = [];
+            let folders = [];
+            for (let div of items) {
+                let content = div.querySelector('.item-content');
+                if (!content || !content.item_attr) continue;
+                if (isFolder(content.item_attr, false)) {
+                    folders.push(content);
+                } else if (isFile(content.item_attr, false)) {
+                    let aTag = div.querySelector("a");
+                    let nameSpan = content.querySelector("div.item-name span");
+                    files.push({
+                        url: new URL(aTag.href),
+                        attr: content.item_attr,
+                        name: nameSpan ? nameSpan.textContent : content.item_attr.name
+                    });
+                }
+            }
+
+            if (files.length === 0 && folders.length === 0) return;
+
+            if (folders.length === 1 && files.length === 0) {
+                let folder = folders[0];
+                if (confirm(`下载文件夹 “${folder.item_attr.name}”？\n（注：浏览器不能在本地创建文件夹，每个文件都需手动选择保存位置。）`)) {
+                    toggleAnimation(true);
+                    fetchingStatusBar.displayInfo("正在获取信息...");
+                    _resolveTree(getFullPath(folder), true);
+                }
+                return;
+            }
+
+            if (folders.length === 0 && files.length > 0) {
+                if (confirm(`将选中的 ${files.length} 个文件加入下载队列？`)) {
+                    for (let f of files) {
+                        cbr.udt.addDownloadTask(f.url, f.attr, f.name);
+                    }
+                    fetchingStatusBar.displayInfo(`已添加 ${files.length} 个文件到下载队列`, -1, 3000);
+                }
+                return;
+            }
+
+            let parts = [];
+            if (folders.length > 0) parts.push(`${folders.length}个文件夹`);
+            if (files.length > 0) parts.push(`${files.length}个文件`);
+            if (confirm(`下载选中的 ${parts.join("、")}？\n（注：浏览器不能在本地创建文件夹，每个文件都需手动选择保存位置。）`)) {
+                for (let f of files) {
+                    cbr.udt.addDownloadTask(f.url, f.attr, f.name);
+                }
+                for (let folder of folders) {
+                    toggleAnimation(true);
+                    fetchingStatusBar.displayInfo(`正在获取 “${folder.item_attr.name}” 信息...`);
+                    await _resolveTree(getFullPath(folder), true);
+                }
+            }
+        });
+    }
     if (window.root_attr.can_trash && window.root_attr.trash === true) {
         document.querySelector('#batch_trash').addEventListener('click', function (e) {
             if (document.getElementById("progress-bar").style.display !== "none") {
