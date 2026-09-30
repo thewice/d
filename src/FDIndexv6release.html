@@ -1594,7 +1594,8 @@ function addDialog(cht) {
 `;
     let container = document.querySelector('body')
     container.insertAdjacentHTML('beforeend', htmlTemplate);
-    let overlay = container.querySelector('.overlay:last-child,.overlay2:last-child'); // div
+    let overlays = container.querySelectorAll('.overlay, .overlay2');
+    let overlay = overlays[overlays.length - 1]; // div
     let dialog = overlay.querySelector(".dialog");
     dialog.insertAdjacentHTML('beforeend', cht);
     let content = dialog.querySelector("div");
