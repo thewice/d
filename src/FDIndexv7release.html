@@ -2061,6 +2061,39 @@ cbr.udt.switchShowRetryBtn = function (ti,) {
         ti.querySelector(".ti-action-retry").style.display = "none"
     }
 }
+let _upload_refresh_timer = null;
+function shouldRefreshCurrentView(pturl) {
+    if (!pturl) return true;
+    try {
+        let cur_path = decodeURIComponent(new URL(window.location.href).pathname);
+        if (!cur_path.endsWith('/')) cur_path += '/';
+        let put_path = decodeURIComponent(pturl.pathname);
+        return put_path.startsWith(cur_path);
+    } catch (e) {
+        return true;
+    }
+}
+
+function requestUploadRefresh(immediate = false) {
+    if (_upload_refresh_timer) {
+        clearTimeout(_upload_refresh_timer);
+        _upload_refresh_timer = null;
+    }
+    const doRefresh = () => {
+        _upload_refresh_timer = null;
+        if (document.getElementById("progress-bar").style.display !== "none") {
+            _upload_refresh_timer = setTimeout(doRefresh, 600);
+            return;
+        }
+        chdir(null);
+    };
+    if (immediate) {
+        doRefresh();
+    } else {
+        _upload_refresh_timer = setTimeout(doRefresh, 1500);
+    }
+}
+
 cbr.udt.upItem = function (ti,) {
     const name = ti.querySelector(".dl-cbr-ti-tip-file-name");
     name.textContent = ti.udti_attr.name
@@ -2093,7 +2126,12 @@ cbr.udt.upItem = function (ti,) {
                 // closeDialog({target: document.getElementById('dialogOverlay')});
                 // chdir(null);
             } else {
-                cbr.udt.startOtherTask(cbr.udt.itypes.upload)
+                const nextTask = cbr.udt.startOtherTask(cbr.udt.itypes.upload);
+                if (!nextTask && !cbr.udt.isUploading()) {
+                    if (shouldRefreshCurrentView(ti.udti_attr.pturl)) {
+                        requestUploadRefresh(true);
+                    }
+                }
             }
         } else if (ti.udti_attr.itype === cbr.udt.itypes.download) {
             cbr.udt.startOtherTask(cbr.udt.itypes.download)
@@ -2110,26 +2148,16 @@ cbr.udt.upItem = function (ti,) {
                 closeDialog({target: document.getElementById('dialogOverlay')});
                 chdir(null);
             } else {
-                const put_path = ti.udti_attr.pturl.pathname.split("/");
-                const cur_path = new URL(window.location.href).pathname.split("/");
-                // console.log(put_path, cur_path)
-                if (cur_path.length > 0 && cur_path.length === put_path.length && cur_path[cur_path.length - 1].length === 0) {
-                    let sm = true;
-                    for (let i = 0; i < cur_path.length - 1; i++) {
-                        if (put_path[i] !== cur_path[i]) {
-                            sm = false
-                            break;
-                        }
-                    }
-                    if (sm) {
-                        if (document.getElementById("progress-bar").style.display !== "none") {
-                            return;
-                        }
-                        chdir(null);
-                    }
+                if (shouldRefreshCurrentView(ti.udti_attr.pturl)) {
+                    requestUploadRefresh(false);
                 }
             }
-            cbr.udt.startOtherTask(cbr.udt.itypes.upload)
+            const nextTask = cbr.udt.startOtherTask(cbr.udt.itypes.upload);
+            if (!nextTask && !cbr.udt.isUploading()) {
+                if (shouldRefreshCurrentView(ti.udti_attr.pturl)) {
+                    requestUploadRefresh(true);
+                }
+            }
         } else if (ti.udti_attr.itype === cbr.udt.itypes.download) {
             cbr.udt.startOtherTask(cbr.udt.itypes.download)
         }
