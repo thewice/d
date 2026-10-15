@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="referrer" content="no-referrer">
     <title>FDIndex</title>
     <link rel="icon" href="data:;base64,=" type="image/x-icon">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1375,6 +1376,19 @@
 </div>
 
 <script>  <!--defer-->
+
+function escapeHTML(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/[&<>'"]/g, function (tag) {
+        return ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+        })[tag] || tag;
+    });
+}
 
 const FDIndex_version = null;
 const Types = Object.freeze({
@@ -2873,7 +2887,7 @@ function addFile(attr) {
         <div class="item-content" draggable="true">
             <i class="item-icon"></i>
             <div class="item-info">
-                <div class="item-name"><span>${attr.name}</span></div>
+                <div class="item-name"><span>${escapeHTML(attr.name)}</span></div>
                 <div class="item-meta">
                 </div>
             </div>
@@ -3058,7 +3072,7 @@ function addFile(attr) {
         <div class="item-content" draggable="true">
             <i class="item-icon"></i>
             <div class="item-info">
-                <div class="item-name"><span>${attr.name}</span></div>
+                <div class="item-name"><span>${escapeHTML(attr.name)}</span></div>
                 <div class="item-meta">
                 </div>
             </div>
@@ -3289,7 +3303,7 @@ function addFile(attr) {
         <div class="item-content" draggable="true">
             <i class="item-icon"></i>
             <div class="item-info">
-                <div class="item-name"><span>${attr.name}</span></div>
+                <div class="item-name"><span>${escapeHTML(attr.name)}</span></div>
                 <div class="item-meta">
                 </div>
             </div>
@@ -4056,7 +4070,7 @@ function addPath(attr, parent_path) {
 <div class="path">
     <a href="#" target="_self" onclick="event.preventDefault();" draggable="false">
         <i class="path-icon"></i>
-        <span draggable="false">${attr.name}</span>
+        <span draggable="false">${escapeHTML(attr.name)}</span>
     </a>
 </div>
 `;
@@ -4923,8 +4937,13 @@ function parseMarkdown(md) {
     }
     html = lines.join('\n');
     html = html.replace(/\*\*([^\*]+?)\*\*/g, '<strong style="color: inherit;">$1</strong>');
-    html = html.replace(/\*([^\*]+?)\*/g, '<em style="color: inherit;">$1</em>');
-    html = html.replace(/\[([^\]]+?)\]\(([^)]+?)\)/g, '<a href="$2" target="_blank" style="color: #1976D2; text-decoration: underline;">$1</a>');
+    html = html.replace(/\[([^\]]+?)\]\(([^)]+?)\)/g, (match, p1, p2) => {
+        let href = p2.trim();
+        if (/^(https?:|\/|#)/i.test(href)) {
+            return `<a href="${href.replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer" style="color: #1976D2; text-decoration: underline;">${p1}</a>`;
+        }
+        return p1;
+    });
     lines = html.split('\n');
     for (let i = 0; i < lines.length; i++) {
         let line = lines[i].trim();
